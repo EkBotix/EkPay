@@ -6,21 +6,42 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:unit": "node --conditions=react-server --import tsx --test tests/*.test.ts",
+    "test:phase1": "node scripts/test-payment-security.mjs",
+    "test:phase2": "node scripts/test-phase-2.mjs",
+    "test:concurrency": "node scripts/test-owner-concurrency.mjs",
+    "test:phase3": "node --conditions=react-server --import tsx scripts/test-phase-3.mjs",
+    "test:phase4": "node scripts/test-phase-4.mjs",
+    "test:phase5": "node --conditions=react-server --import tsx scripts/test-phase-5.mjs",
+    "test:phase6": "node --conditions=react-server --import tsx scripts/test-phase-6.mjs",
+    "simulate:parser": "npm run test:phase6",
+    "sandbox:android": "node --conditions=react-server --import tsx scripts/parser-sandbox-bridge.mjs",
+    "test:phase7": "node --conditions=react-server --import tsx scripts/test-phase-7.mjs",
+    "vectors:parser": "node --conditions=react-server --import tsx scripts/parser-protocol-vectors.mjs",
+    "test": "npm run test:unit && npm run test:phase1 && npm run test:phase2 && npm run test:concurrency && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.117.2",
     "next": "16.3.6",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "0.0.1",
+    "zod": "4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "embedded-postgres": "18.4.0-beta.17",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "pg": "8.23.0",
     "tailwindcss": "^4",
+    "tsx": "4.23.15",
     "typescript": "^5"
   }
 }
