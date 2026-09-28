@@ -5,6 +5,8 @@ export const abilities = [
   "transactions:read",
   "webhooks:read",
   "webhooks:manage",
+  "trx:verify",
+  "trx:confirm",
 ] as const;
 export const uuidSchema = z.uuid();
 export const roleSchema = z.enum(["owner", "admin", "developer", "viewer"]);
@@ -51,7 +53,7 @@ export const keySchema = z
     abilities: z
       .array(z.enum(abilities))
       .min(1)
-      .max(5)
+      .max(7)
       .refine((v) => new Set(v).size === v.length),
   })
   .strict();

@@ -9,11 +9,19 @@ import {
 import {
   ApiError,
   apiFailure,
+  confirmTransactionSchema,
   intentRequestSchema,
   idempotencySchema,
+  transactionApiFailure,
+  verificationIdSchema,
+  verifyTransactionSchema,
 } from "../lib/api/contract";
 import { readJson } from "../lib/api/body";
 import { createIntent, readIntent } from "../lib/api/payment-intents";
+import {
+  confirmTransaction,
+  verifyTransaction,
+} from "../lib/api/transactions";
 const pepper = "synthetic-fixture-pepper-not-production";
 const material = generateApiKey("test", pepper);
 const candidate: KeyCandidate = {
@@ -134,6 +142,43 @@ test("strict bounded request contract rejects client tenant/state, floats, inval
   for (const key of ["short", "x".repeat(129), "order/12345", ""])
     assert.ok(!idempotencySchema.safeParse(key).success);
 });
+test("transaction API contract normalizes lookup IDs and rejects forged state, unsafe money and unknown providers", () => {
+  assert.deepEqual(
+    verifyTransactionSchema.parse({
+      transaction_id: "  test_reference-1 ",
+      amount: 15000,
+    }),
+    { transaction_id: "TEST_REFERENCE-1", amount: 15000 },
+  );
+  assert.ok(
+    verifyTransactionSchema.safeParse({
+      transaction_id: "BKASH1",
+      amount: 15000,
+      provider: "bkash",
+    }).success,
+  );
+  for (const value of [
+    { transaction_id: "BKASH1", amount: 1.5 },
+    { transaction_id: "BKASH1", amount: 0 },
+    { transaction_id: "BKASH1", amount: 100000001 },
+    { transaction_id: "contains spaces", amount: 1 },
+    { transaction_id: "BKASH1", amount: 1, provider: "unknown" },
+    { transaction_id: "BKASH1", amount: 1, merchant_id: candidate.merchant_id },
+    { transaction_id: "BKASH1", amount: 1, trusted: true },
+  ])
+    assert.ok(!verifyTransactionSchema.safeParse(value).success);
+  const verificationId = "vr_" + "a".repeat(32);
+  assert.ok(verificationIdSchema.safeParse(verificationId).success);
+  assert.ok(
+    confirmTransactionSchema.safeParse({ verification_id: verificationId }).success,
+  );
+  assert.ok(
+    !confirmTransactionSchema.safeParse({
+      verification_id: verificationId,
+      transaction_id: "forged",
+    }).success,
+  );
+});
 test("streamed bodies enforce actual bytes and JSON media type without exposing request contents", async () => {
   const req = (value: string, type = "application/json") =>
     new Request("http://localhost/api", {
@@ -177,6 +222,20 @@ test("actual handlers fail closed and ignore query/cookie credentials", async ()
     const response = await readIntent(req, "pi_" + "a".repeat(32));
     assert.equal(response.status, 401);
     assert.ok(!(await response.text()).includes(material.secret));
+    for (const handler of [verifyTransaction, confirmTransaction]) {
+      const denied = await handler(
+        new Request("http://localhost/v1/trx", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{}",
+        }),
+      );
+      assert.equal(denied.status, 401);
+      assert.equal((await denied.json()).success, false);
+    }
+    const safe = await transactionApiFailure(new Error(material.secret));
+    assert.equal(safe.status, 503);
+    assert.ok(!(await safe.text()).includes(material.secret));
   } finally {
     if (old === undefined) delete process.env.EKPAY_DEVELOPMENT_API_ENABLED;
     else process.env.EKPAY_DEVELOPMENT_API_ENABLED = old;
